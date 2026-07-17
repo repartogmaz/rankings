@@ -338,7 +338,7 @@
 
   .client-table thead th {
     position: sticky;
-    top: 107px; /* 58 header + 49 toolbar */
+    top: 0; /* set dynamically by JS after render */
     background: #F0F4F8;
     border-top: 1px solid var(--border);
     border-bottom: 2px solid var(--border);
@@ -356,6 +356,12 @@
 
   th.th-chk { width: 44px; text-align: center; }
   th.th-num { text-align: right; }
+
+  th.sortable { cursor: pointer; transition: background 0.12s, color 0.12s; }
+  th.sortable:hover { background: #DDE6F5; color: var(--primary); }
+  th.sortable.asc .sort-arr::after  { content: ' ↑'; opacity: 1; color: var(--primary); }
+  th.sortable.desc .sort-arr::after { content: ' ↓'; opacity: 1; color: var(--primary); }
+  th.sortable:not(.asc):not(.desc) .sort-arr::after { content: ' ↕'; opacity: 0.35; }
 
   .client-table tbody tr.cr-main:hover { background: var(--hover); }
   .client-table tbody tr.cr-main.sel { background: var(--sel-bg); }
@@ -753,15 +759,15 @@
   <div class="table-wrap">
     <table class="client-table">
       <thead>
-        <tr>
+        <tr id="thead-row">
           <th class="th-chk">✓</th>
-          <th>Código</th>
-          <th>Cliente</th>
-          <th style="text-align:center">Frec.</th>
-          <th>Creación</th>
-          <th class="th-num">Mayo</th>
-          <th class="th-num">Junio</th>
-          <th class="th-num">Julio</th>
+          <th class="sortable" onclick="sortBy('codigo')">Código<span class="sort-arr"></span></th>
+          <th class="sortable" onclick="sortBy('nombre')">Cliente<span class="sort-arr"></span></th>
+          <th class="sortable" onclick="sortBy('frec')" style="text-align:center">Frec.<span class="sort-arr"></span></th>
+          <th class="sortable" onclick="sortBy('creacion')">Creación<span class="sort-arr"></span></th>
+          <th class="sortable th-num" onclick="sortBy('mayo')">Mayo<span class="sort-arr"></span></th>
+          <th class="sortable th-num" onclick="sortBy('junio')">Junio<span class="sort-arr"></span></th>
+          <th class="sortable th-num" onclick="sortBy('julio')">Julio<span class="sort-arr"></span></th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -879,6 +885,7 @@ let state = {
   onlySel: false,
   scriptUrl: 'https://script.google.com/macros/s/AKfycbxxMFRvg8b9qgc5t4eJ_AhoPCrqYefoVFpDG_cUOK8jamy0uuZXhNVVO8NO5Wgh7rx4/exec',
   submitted: false,
+  sort: { col: null, dir: 1 },
 };
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
@@ -923,6 +930,7 @@ function doLogin() {
   state.filter = '';
   state.onlySel = false;
   state.submitted = false;
+  state.sort = { col: null, dir: 1 };
 
   $('hdr-ruta').textContent = val;
   $('hdr-total').textContent = state.rutaClients.length;
@@ -953,11 +961,22 @@ function renderTable() {
   const q = state.filter.toLowerCase();
   const total = state.rutaClients.length;
 
-  const visible = state.rutaClients.filter(c => {
+  let visible = state.rutaClients.filter(c => {
     if (state.onlySel && !state.sel[c.codigo]) return false;
     if (q) return c.codigo.includes(q) || c.nombre.toLowerCase().includes(q);
     return true;
   });
+
+  // Sort
+  if (state.sort.col) {
+    const { col, dir } = state.sort;
+    visible = [...visible].sort((a, b) => {
+      let av = a[col], bv = b[col];
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+  }
 
   $('toolbar-info').textContent =
     q || state.onlySel
@@ -1032,6 +1051,40 @@ function renderTable() {
   }
 
   tbody.innerHTML = rows;
+
+  // Fix sticky header top dynamically
+  updateStickyTop();
+
+  // Update sort arrows
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.classList.remove('asc','desc');
+  });
+  if (state.sort.col) {
+    // find the th whose onclick matches the col
+    const th = document.querySelector(`th[onclick="sortBy('${state.sort.col}')"]`);
+    if (th) th.classList.add(state.sort.dir === 1 ? 'asc' : 'desc');
+  }
+}
+
+// ── STICKY HEADER ─────────────────────────────────────────────────────────────
+function updateStickyTop() {
+  const hdrH     = document.querySelector('.app-header')?.offsetHeight || 58;
+  const toolbarH = document.querySelector('.toolbar')?.offsetHeight    || 50;
+  const top      = hdrH + toolbarH;
+  document.querySelectorAll('.client-table thead th').forEach(th => {
+    th.style.top = top + 'px';
+  });
+}
+
+// ── SORT ──────────────────────────────────────────────────────────────────────
+function sortBy(col) {
+  if (state.sort.col === col) {
+    state.sort.dir *= -1;
+  } else {
+    state.sort.col = col;
+    state.sort.dir = 1;
+  }
+  renderTable();
 }
 
 // ── INTERACTIONS ──────────────────────────────────────────────────────────────
@@ -1261,6 +1314,7 @@ window.onload = () => {
     sel.appendChild(o);
   });
   showScreen('screen-login');
+  window.addEventListener('resize', updateStickyTop);
 };
 
 document.addEventListener('keydown', e => {
