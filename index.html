@@ -326,8 +326,8 @@
 
   /* ── TABLE ── */
   .table-wrap {
-    overflow-x: auto;
-    padding-bottom: 90px;
+    overflow: auto;
+    height: calc(100vh - 200px); /* refined by JS */
   }
 
   .client-table {
@@ -338,7 +338,7 @@
 
   .client-table thead th {
     position: sticky;
-    top: 0; /* set dynamically by JS after render */
+    top: 0;
     background: #F0F4F8;
     border-top: 1px solid var(--border);
     border-bottom: 2px solid var(--border);
@@ -940,6 +940,7 @@ function doLogin() {
   state.scriptUrl = saved;
 
   showScreen('screen-app');
+  updateLayout();
   renderTable();
   updateBar();
 }
@@ -1053,7 +1054,7 @@ function renderTable() {
   tbody.innerHTML = rows;
 
   // Fix sticky header top dynamically
-  updateStickyTop();
+  updateLayout();
 
   // Update sort arrows
   document.querySelectorAll('th.sortable').forEach(th => {
@@ -1066,14 +1067,14 @@ function renderTable() {
   }
 }
 
-// ── STICKY HEADER ─────────────────────────────────────────────────────────────
-function updateStickyTop() {
-  const hdrH     = document.querySelector('.app-header')?.offsetHeight || 58;
-  const toolbarH = document.querySelector('.toolbar')?.offsetHeight    || 50;
-  const top      = hdrH + toolbarH;
-  document.querySelectorAll('.client-table thead th').forEach(th => {
-    th.style.top = top + 'px';
-  });
+// ── LAYOUT: size the scroll container so thead sticky works at top:0 ──────────
+function updateLayout() {
+  const tw = document.querySelector('.table-wrap');
+  if (!tw) return;
+  const hh = document.querySelector('.app-header')?.offsetHeight  || 58;
+  const th = document.querySelector('.toolbar')?.offsetHeight     || 50;
+  const sh = document.querySelector('.submit-bar')?.offsetHeight  || 72;
+  tw.style.height = `calc(100vh - ${hh + th + sh}px)`;
 }
 
 // ── SORT ──────────────────────────────────────────────────────────────────────
@@ -1314,7 +1315,7 @@ window.onload = () => {
     sel.appendChild(o);
   });
   showScreen('screen-login');
-  window.addEventListener('resize', updateStickyTop);
+  window.addEventListener('resize', updateLayout);
 };
 
 document.addEventListener('keydown', e => {
